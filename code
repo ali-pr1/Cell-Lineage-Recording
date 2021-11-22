@@ -1,0 +1,420 @@
+import numpy as np
+import pandas as pd
+
+import imageio
+import imagesc
+
+from pathlib import Path
+import os
+import subprocess
+
+import matplotlib.pyplot as plt
+
+import skimage
+import skimage.io
+import skimage.registration
+import skimage.filters
+import skimage.morphology
+import skimage.segmentation
+from skimage.filters import threshold_otsu, threshold_multiotsu, try_all_threshold
+from skimage import registration
+from skimage.feature import ORB, match_descriptors
+from skimage.transform import matrix_transform
+from skimage import data
+from skimage.feature import register_translation
+from skimage.feature import peak_local_max
+from skimage.measure import label
+from skimage.morphology import closing, square
+from skimage.measure import regionprops_table
+from skimage.color import label2rgb
+from skimage import exposure
+from skimage.util import map_array
+from skimage import restoration
+
+from scipy import ndimage as ndi
+from scipy.ndimage import fourier_shift
+
+import os
+import glob
+
+import bebi103
+
+import colorcet
+
+import bokeh
+bokeh.io.output_notebook()
+
+import holoviews as hv
+hv.extension('bokeh')
+bebi103.hv.set_defaults()
+
+import panel as pn
+
+from sklearn import linear_model
+import scipy
+import copy
+import cv2
+
+import imagej
+
+
+
+pos = 20 # the example position I want to try out here
+data_dir = 'E:\\ALI\\processing project\\Zombie\\dil 1'
+
+path_max = sorted(glob.glob(data_dir + '\\max\\*.tif'))
+
+
+#image registration
+HybCycle_00 = skimage.io.imread(path_max[1])
+num_pos = HybCycle_00.shape[0] # this is the number of positions in the experiment
+registration_return = [ [] for _ in range(num_pos) ]
+
+for i in range(len(path_max)):
+    HybCycle_i = skimage.io.imread(path_max[i])
+    for j in range(num_pos):
+        reference_image = HybCycle_00[j,5,:,:]
+        moving_image = HybCycle_i[j,5,:,:]
+        registration_return[j].append(skimage.registration.phase_cross_correlation(reference_image, moving_image, upsample_factor=20))
+        #flow=skimage.registration.optical_flow_tvl1(reference_image,moving_image)
+        # flow method calculate a vector field shift instead of scalar field shift
+        # more time, more accuracy
+        #flow_x=flow[1,:,:]
+        #flow_y=flow[0,:,:]
+        #x_sh=np.mean(flow_x)
+        #y_sh=np.mean(flow_y)
+        #registration_return[j].append(ndi.shift(moving_image,shift=(x_sh,y_sh),mode="constant"))
+        
+# apply the registrations and save one file for position
+im_shape = (len(path_max), HybCycle_00.shape[1], HybCycle_00.shape[2], HybCycle_00.shape[3])
+# image shape: [position, channel, pixels]
+
+for i in range(num_pos):
+    im_temp = np.zeros(im_shape, dtype=np.uint16)
+    for j in range(len(path_max)):
+        HybCycle_j = skimage.io.imread(path_max[j])
+        for c in range(HybCycle_00.shape[1]):
+            moving_image = HybCycle_j[i,c,:,:]
+            moved_image = ndi.shift(moving_image, registration_return[i][j][0])
+            #what is the purpose of this shift?
+            im_temp[j,c,:,:] = moved_image
+    
+    file_name = data_dir + '\\Analysis\\registered\\' + 'pos_{:02d}.tif'.format(i+1)
+    skimage.io.imsave(file_name, im_temp, check_contrast=False)
+
+# it worked well except maybe for position 17 
+DAPI_channel = 5
+load_path = data_dir + '\\Analysis\\registered\\'
+save_path = data_dir + '\\Analysis\\DAPI\\'
+
+im_names = sorted(glob.glob(load_path + '*.tif'))
+for i in range(len(im_names)):
+    im_temp = skimage.io.imread(im_names[i])
+    dapi_im_name = save_path + 'pos_{:02d}.tif'.format(i+1)
+    skimage.io.imsave(dapi_im_name, im_temp[1,DAPI_channel,:,:], check_contrast=False)
+from cellpose import utils
+from cellpose import io
+from cellpose import plot
+from cellpose import models
+# segment extracted dapi images (one per position) using Cellpose
+# See here for more info:
+# https://cellpose.readthedocs.io/en/latest/outputs.html
+
+
+files = sorted(glob.glob(save_path + 'pos_??.tif'))
+
+# DEFINE CELLPOSE MODEL
+# model_type='cyto' or model_type='nuclei'
+model = models.Cellpose(gpu=False, model_type='nuclei')
+
+# define CHANNELS to run segementation on
+channels = [[0,0]]*len(files)
+# channel list aboves shows you want to segment in blue scales
+for chan, filename in zip(channels, files):
+    img = io.imread(filename)
+    masks, flows, styles, diams = model.eval(img, diameter=160, resample=True, channels=chan)
+
+    # save results so you can load in gui
+    io.masks_flows_to_seg(img, masks, flows, diams, filename, chan)
+
+    # save results as png
+    io.save_to_png(img, masks, flows, filename)
+    
+    # DISPLAY RESULTS
+    fig = plt.figure(figsize=(12,5))
+    plot.show_segmentation(fig, img, masks, flows[0], channels=chan)
+    plt.tight_layout()
+    plt.show()
+# the following positions had imperfect or uncertain nuclear segmentation
+imperfect_nucSeg_pos = [2, 3, 10, 13, 14, 18, 21, 22]
+# Also, you may need to remove small objects later for example in position 18 or 6
+ch_name = ["647","488","555","594","CFP","DAPI"]
+hyb_num = 18 # number of hyb rounds
+fish_ch_num = 4 # number of channels used for FISH that we want to segment
+
+load_path = data_dir + '\\Analysis\\registered\\'
+im_names = sorted(glob.glob(load_path + '*.tif'))
+
+for i in range(len(im_names)):
+    im_temp = skimage.io.imread(im_names[i])
+    
+    for j in range(fish_ch_num):
+        save_path = data_dir + '\\Analysis\\' + ch_name[j] + '_registered'
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        
+        for k in range(hyb_num):
+            ch_im_name = save_path + '\\AF'+ ch_name[j] +'_pos{:02d}_hyb{:02d}.tif'.format(i+1,k+1)
+            skimage.io.imsave(ch_im_name, im_temp[k,j,:,:], check_contrast=False)
+# Run iLastik for dot segmentation in each channel
+# the classifiers are trained and tested already
+# I was unable to export any output from subprocess function
+ch_name = ["647","488","555","594","CFP","DAPI"]
+hyb_num = 18 # number of hyb rounds
+fish_ch_num = 4 # number of channels used for FISH that we want to segment
+
+ilastik_projects_name = ['dotSeg_647_210401.ilp','dotSeg_488_210407.ilp','dotSeg_555_210412.ilp','dotSeg_594_210413.ilp']
+
+for i in range(fish_ch_num):
+    in_folder = Path(data_dir + '\\Analysis\\' + ch_name[i] + '_registered')
+    out_folder = Path(data_dir + '\\Analysis\\' + ch_name[i] + '_registered\\Ilastik_output')
+    ilp = Path(data_dir + '\\Analysis\\' + ilastik_projects_name[i])
+
+    for in_file in in_folder.glob("*.tif"):
+        if str(in_file)[-19:-16] in ch_name:
+            # generate some output file name
+            out_file = out_folder / in_file.name.replace(".tif", "_Probabilities.tif")
+            print(f"Processing {in_file} -> {out_file}")
+            subprocess.run([
+                "C:\Program Files\ilastik-1.3.3post3\ilastik.exe",
+                '--headless',
+                f'--project="{ilp}"',
+                '--export_source="Probabilities"',
+                f'--raw_data="{in_file}"',
+                f'--output_filename_format="{out_file}"' 
+            ])
+#thresholding
+#using otsu method(best results in try_all_thresholds)
+ch_name = ["647","488","555","594"]
+hyb_num=18
+num_pos=24
+for ch in range(len(ch_name)):
+   FISH_path = data_dir + '\\Analysis\\' + ch_name[ch] + '_registered\\' + '\\Ilastik_output\\'
+   for p in range(1,num_pos+1):
+      for h in range(1,hyb_num+1):
+         mask_temp = skimage.io.imread(FISH_path+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_Probabilities.tif'.format(p,h))
+         img = mask_temp[:,:,1]
+         #denoise using gaussians
+         blurred_image = skimage.filters.gaussian(img, sigma=1)
+         #method below is time consuming but probably more accurate
+         #img=skimage.img_as_float(img)
+         #sigma_est=np.mean(restoration.estimate_sigma(img))
+         #denoise=restoration.denoise_nl_means(img)
+         #blurred_image=skimage.img_as_ubyte(denoise)
+         # perform automatic thresholding to produce a binary image
+         t = skimage.filters.threshold_otsu(blurred_image)
+         binary_mask = blurred_image > t
+         file_name = data_dir + '\\Analysis\\' + ch_name[ch]  + '_threshold\\'+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_seg.tif'.format(p,h)
+         skimage.io.imsave(file_name, binary_mask, check_contrast=False)
+#watershed
+#the results were not bad but they can improve
+ch_name = ["647","488","555","594"]
+hyb_num=18
+num_pos=24
+for ch in range(len(ch_name)):
+    seg_path = data_dir + '\\Analysis\\' + ch_name[ch]  + '_threshold\\'
+    for p in range(1,num_pos+1):
+        for h in range(1,hyb_num+1):
+            binary_mask= skimage.io.imread(seg_path+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_seg.tif'.format(p,h))
+            binary_mask=skimage.segmentation.clear_border(binary_mask)
+            distance = -1 * ndi.distance_transform_edt(binary_mask)
+            local_mini = skimage.morphology.local_minima(distance)
+            selem = skimage.morphology.disk(1)
+            local_mini_dil = skimage.morphology.dilation(local_mini, selem)
+            mrkr = ndi.label(local_mini_dil)[0]
+            labels = skimage.segmentation.watershed(distance, markers = mrkr, mask=binary_mask, watershed_line=True)
+            labels1=ndi.morphology.binary_fill_holes(labels)
+            file_name = data_dir + '\\Analysis\\' + ch_name[ch]  + '_watershed\\'+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_wtrshed.tif'.format(p,h)
+            skimage.io.imsave(file_name, labels1, check_contrast=False)
+#removing labels with high eccentricity
+#change ecc_threshold as you wish
+ch_name = ["647","488","555","594"]
+hyb_num=18
+num_pos=24
+
+
+for ch in range(len(ch_name)):
+    wtrshed_path = data_dir + '\\Analysis\\' + ch_name[ch]  + '_watershed\\'
+    for p in range(1,num_pos+1):
+            for h in range(1,hyb_num+1):
+                img= skimage.io.imread(data_dir + '\\Analysis\\' + ch_name[ch]  + '_watershed\\'+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_wtrshed.tif'.format(p,h))
+                labeled = label(img)
+                data = regionprops_table(
+                labeled,
+                properties=('label', 'eccentricity'),
+                ) 
+                table = pd.DataFrame(data)
+                ecc_threshold = 0.7
+                eccentric_labels = table['label'] * (table['eccentricity'] < ecc_threshold)
+                new_labels = map_array(
+                labeled,
+                np.asarray(table['label']),
+                np.asarray(eccentric_labels),
+                )
+   
+                file_name = data_dir + '\\Analysis\\' + ch_name[ch]  + '_actvsite_1\\'+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_actvsite.tif'.format(p,h)
+                skimage.io.imsave(file_name, new_labels, check_contrast=False)
+#Rolling Ball background subtraction
+#choose the radius as you wish(high radius are not beautiful at all but 1?)
+ch_name = ["647","488","555","594"]
+hyb_num=18
+num_pos=24
+
+for ch in range(len(ch_name)):
+    for p in range(1,num_pos+1):
+            for h in range(1,hyb_num+1):
+                orginal=skimage.io.imread(data_dir + '\\Analysis\\' + ch_name[ch]  + '_registered\\'+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}.tif'.format(p,h))
+                background = skimage.restoration.rolling_ball(orginal,radius=1)
+                orginal=orginal-background
+                file_name = data_dir + '\\Analysis\\' + ch_name[ch]  + '_rolling_ball\\'+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_subtract.tif'.format(p,h)
+                skimage.io.imsave(file_name, orginal, check_contrast=False)
+
+
+
+#this funtion is designed to identify active sites based on colocalization
+#too much time consuming
+ch_name = ["647","555","594"]
+hyb_num=18
+num_pos=24
+
+for ch in range(len(ch_name)):
+    for p in range(1,num_pos+1):
+        nuclei=skimage.io.imread(data_dir + '\\Analysis\\' +'\\DAPI\\'+'pos_{:02d}_cp_masks.png'.format(p))
+        nuclei,num=label(nuclei,return_num=True)
+        data={"inf":ch_name[ch] +'_pos{:02d}'.format(p),'lab_num':np.arange(0,num)}
+        df=pd.DataFrame(data)
+        for h in range(1,hyb_num+1):
+            img= skimage.io.imread(data_dir + '\\Analysis\\' + ch_name[ch]  + '_actvsite_1\\'+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_actvsite.tif'.format(p,h))
+            cell_samp=[]
+            coordinates = peak_local_max(img, min_distance=20)
+            for i in range(0,num):
+                cell_samp.append(list([]))
+                bint=nuclei==i
+                for coords1 in coordinates:
+                     if bint[coords1[0],coords1[1]]==True:
+                        cell_samp[i].append([coords1[0],coords1[1]])
+            df["hyb_{:02d}".format(h)]=cell_samp
+        for h in range(1,hyb_num+1):
+            lst=[]
+            for i in range(0,df.shape[0]):
+                lst.append([])
+                cell_samp1=list(df[df["lab_num"]==i]["hyb_{:02d}".format(h)])[0]
+                for pts1 in cell_samp1:
+                    count=0
+                    for k in range(1,hyb_num+1):
+                        cell_samp2=list(df[df["lab_num"]==i]["hyb_{:02d}".format(k)])[0]
+                        for pts2 in cell_samp2:
+                            dist= np.sqrt((float(pts1[0])-float(pts2[0]))**2+((float(pts1[1])-float(pts2[1]))**2))
+                            if dist<=10:
+                                count+=1
+                            else :
+                                pass
+                    if count<6:
+                        lst[i].append([pts1[0],pts1[1]])
+            df['not_coloc_hyb_{:02d}'.format(h)]=lst
+        for h in range(1,hyb_num+1):
+            img= skimage.io.imread(data_dir + '\\Analysis\\' + ch_name[ch]  + '_actvsite_1\\'+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_actvsite.tif'.format(p,h))
+            for i in range(0,df.shape[0]):
+                for k in range(len(df['not_coloc_hyb_{:02d}'.format(h)][i])):
+                    x0=df['not_coloc_hyb_{:02d}'.format(h)][i][k][0]
+                    y0=df['not_coloc_hyb_{:02d}'.format(h)][i][k][1]
+                    for y in range(1,2049):
+                        for x in range(1,2049):
+                            if (x-x0)**2+(y-y0)**2<=100:
+                                img[x,y]=0
+            file_name = data_dir + '\\Analysis\\' + ch_name[ch]  + '_actvsite_2\\'+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_coloc.tif'.format(p,h)
+            skimage.io.imsave(file_name, img, check_contrast=False)
+
+        file_name = data_dir + '\\Analysis\\' + ch_name[ch]  + '_coloc\\'+'AF'+ ch_name[ch] +'_pos{:02d}_coloc.xlsx'.format(p)
+        df.to_excel(file_name)
+
+
+
+
+#this funtion is designed to identify active sites based on area
+ch_name = ["647","488","555","594"]
+hyb_num=18
+num_pos=24
+
+for ch in range(len(ch_name)):
+    wtrshed_path = data_dir + '\\Analysis\\' + ch_name[ch]  + '_watershed\\'
+    for p in range(1,num_pos+1):
+            for h in range(1,hyb_num+1):
+                img= skimage.io.imread(data_dir + '\\Analysis\\' + ch_name[ch]  + '_actvsite_1\\'+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_actvsite.tif'.format(p,h))
+                labeled = label(img)
+                data = regionprops_table(
+                labeled,
+                properties=('label', 'area'),
+                ) 
+                table = pd.DataFrame(data)
+                area_threshold = 200
+                area_labels = table['label'] * (table['area'] > area_threshold)
+                new_labels = map_array(
+                labeled,
+                np.asarray(table['label']),
+                np.asarray(area_labels),
+                )
+   
+                file_name = data_dir + '\\Analysis\\' + ch_name[ch]  + '_actvsite_2\\'+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_actvsite2.tif'.format(p,h)
+                skimage.io.imsave(file_name, new_labels, check_contrast=False)
+                
+
+
+
+ch_name = ["647","488","555","594"]
+hyb_num=18
+num_pos=24
+for ch in range(len(ch_name)):
+    for p in range(1,num_pos+1):
+            nuclei=skimage.io.imread(data_dir + '\\Analysis\\' +'\\DAPI\\'+'pos_{:02d}_cp_masks.png'.format(p))
+            nuclei,num=label(nuclei,return_num=True)
+            data={"inf":ch_name[ch] +'_pos{:02d}'.format(p),'lab_num':np.arange(0,num)}
+            df=pd.DataFrame(data)
+            for h in range(1,hyb_num+1):
+                    img= skimage.io.imread(data_dir + '\\Analysis\\' + ch_name[ch]  + '_actvsite_2\\'+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_actvsite2.tif'.format(p,h))
+                    org= skimage.io.imread(data_dir + '\\Analysis\\' + ch_name[ch]  + '_registered\\'+ 'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}.tif'.format(p,h))
+                    fg=np.where(img!=0)
+                    img[fg]=org[fg]
+                    data1 = regionprops_table(
+                            label(img,connectivity=2),
+                            img,
+                            properties=('label', 'centroid','area','mean_intensity','filled_area'),
+                    )
+                    #labeling is discontinuous and disperse
+                    #maybe one good way to make make them more real is clustring(DBSCAN)
+                    #took too much time and maybe unnecessary?
+                    table = pd.DataFrame(data1)
+                    lst1=list(table['centroid-0'])
+                    lst2=list(table['centroid-1'])
+                    lst3=list(table['mean_intensity'])
+                    lst4=list(table['filled_area'])
+                    lst=[[lst1[i],lst2[i],lst3[i],lst4[i]] for i in range(len(lst1))]
+                    intensity=[]
+                    props = lst
+                    for i in range(0,num):
+                            intensity.append(list([]))
+                            lis=[]
+                            bint=nuclei==i
+                            for prop in props:
+                                    if bint[int(prop[0]),int(prop[1])]==True:
+                                            lis.append(prop[2]*prop[3])
+                            intensity[i].append(sum(lis))
+                    df["hyb_{:02d}_intens".format(h)]=intensity
+                    file_name = data_dir + '\\Analysis\\' + ch_name[ch]  + '_intens\\'+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_intens.tif'.format(p,h)
+                    skimage.io.imsave(file_name, img, check_contrast=False)
+            file_name1 = data_dir + '\\Analysis\\' + ch_name[ch]  + '_props\\'+'AF'+ ch_name[ch] +'_pos{:02d}_props.xlsx'.format(p)
+            df.to_excel(file_name1)
+                    
+                    
+                    
+ 
