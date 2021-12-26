@@ -1,0 +1,28 @@
+import numpy as np
+import skimage
+
+
+ch_name = ["647","488","555","594"]
+ch=2
+h=8
+p=1
+orginal=skimage.io.imread(data_dir + '\\Analysis\\' + ch_name[ch]  + '_registered\\'+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}.tif'.format(p,h))
+rad=[1,5,10,20,50]
+for i in rad:
+    background = skimage.restoration.rolling_ball(orginal,radius=i)
+    orginal=orginal-background
+    file_name = data_dir + '\\Analysis\\' '_pos_hyb_rad{:02d}.tif'.format(i)
+    skimage.io.imsave(file_name, orginal, check_contrast=False)
+for i in rad:
+    print(str(i)+':')
+    file_name = data_dir + '\\Analysis\\' '_pos_hyb_rad{:02d}.tif'.format(i)
+    orginal=skimage.io.imread(file_name)
+    print(np.sum(orginal))
+    print(np.mean(orginal))
+
+orginal=skimage.io.imread(data_dir + '\\Analysis\\' '_pos_hyb_rad50ImageJ.tif')
+print(np.sum(orginal))
+print(np.mean(orginal))
+orginal=skimage.io.imread(data_dir + '\\Analysis\\' + ch_name[ch]  + '_registered\\'+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}.tif'.format(p,h))
+print(np.sum(orginal))
+print(np.mean(orginal))
