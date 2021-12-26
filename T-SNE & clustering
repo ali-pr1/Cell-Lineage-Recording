@@ -1,3 +1,12 @@
+from sklearn.manifold import TSNE
+from scipy.spatial import distance
+import seaborn as sns
+import numpy as np
+import pandas as pd
+from sklearn.cluster import KMeans
+import matplotlib.pyplot as plt
+
+
 df = pd.read_excel ('E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\pos1\\{:02d}\\'.format(p)+'_pos{:02d}dy1.xlsx'.format(p))
 df1 = pd.read_excel ('E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\pos1\\{:02d}\\'.format(p)+'_pos{:02d}dy2.xlsx'.format(p))
 df2 = pd.read_excel ('E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\pos1\\{:02d}\\'.format(p)+'_pos{:02d}st.xlsx'.format(p))
