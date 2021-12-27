@@ -7,17 +7,79 @@ from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 
 
-df = pd.read_excel ('E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\pos1\\{:02d}\\'.format(p)+'_pos{:02d}dy1.xlsx'.format(p))
-df1 = pd.read_excel ('E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\pos1\\{:02d}\\'.format(p)+'_pos{:02d}dy2.xlsx'.format(p))
-df2 = pd.read_excel ('E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\pos1\\{:02d}\\'.format(p)+'_pos{:02d}st.xlsx'.format(p))
-hyb_num=18
+#merge all observations
+#dy1: 647,555,dynamic rounds
+#dy2: 488, 594,dynamic rounds
+#st:all channels, static rounds
+df = pd.read_excel ('E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\pos1\\{:02d}\\'.format(1)+'_pos{:02d}dy1.xlsx'.format(1))
+df['pos']=[1 for i in range(len(df))]
+#computation is slow but when finished we use 24 instead of 6
+for p in range(3,6):
+    dfa = pd.read_excel ('E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\pos1\\{:02d}\\'.format(p)+'_pos{:02d}dy1.xlsx'.format(p))
+    dfa['pos']=[p for i in range(len(dfa))]
+    df=df.append(dfa)
+file_name = data_dir+'_pos_cell_num_actvsite_props.xlsx'
+df.to_excel(file_name)
+
+df1 = pd.read_excel ('E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\pos1\\{:02d}\\'.format(1)+'_pos{:02d}dy2.xlsx'.format(1))
+df1['pos']=[1 for i in range(len(df1))]
+for p in range(3,6):
+    dfa = pd.read_excel ('E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\pos1\\{:02d}\\'.format(p)+'_pos{:02d}dy2.xlsx'.format(p))
+    dfa['pos']=[p for i in range(len(dfa))]
+    df1=df1.append(dfa)
+file_name = data_dir+'_pos_cell_num_actvsite_props2.xlsx'
+df1.to_excel(file_name)
+
+
+df2 = pd.read_excel ('E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\pos1\\{:02d}\\'.format(1)+'_pos{:02d}st.xlsx'.format(1))
+df2['pos']=[1 for i in range(len(df2))]
+for p in range(3,6):
+    dfa = pd.read_excel ('E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\pos1\\{:02d}\\'.format(p)+'_pos{:02d}st.xlsx'.format(p))
+    dfa['pos']=[p for i in range(len(dfa))]
+    df2=df2.append(dfa)
+file_name = data_dir+'_pos_cell_num_actvsite_props3.xlsx'
+df2.to_excel(file_name)
+
+
+df = pd.read_excel(data_dir+'_pos_cell_num_actvsite_props.xlsx')
 df.drop(columns='Unnamed: 0',inplace=True)
 df.drop(columns='inf',inplace=True)
-df1.drop(columns='inf',inplace=True)
-df2.drop(columns='inf',inplace=True)
+df.drop(columns='Unnamed: 0.1',inplace=True)
+df
+df1 = pd.read_excel(data_dir+'_pos_cell_num_actvsite_props2.xlsx')
 df1.drop(columns='Unnamed: 0',inplace=True)
+df1.drop(columns='inf',inplace=True)
+df1.drop(columns='Unnamed: 0.1',inplace=True)
+df1
+df2 = pd.read_excel(data_dir+'_pos_cell_num_actvsite_props3.xlsx')
 df2.drop(columns='Unnamed: 0',inplace=True)
-lst=df['647']
+df2.drop(columns='inf',inplace=True)
+df2.drop(columns='Unnamed: 0.1',inplace=True)
+df2
+# in few cases intensity values are zero. for sake of logarithm I changed them to 1
+for i in range(len(df)):
+    if df['647'][i]==0:
+        df['647'][i]=1
+    if df['555'][i]==0:
+        df['555'][i]=1
+for i in range(len(df1)):
+    if df1['488'][i]==0:
+        df1['488'][i]=1
+    if df1['594'][i]==0:
+        df1['594'][i]=1
+for i in range(len(df2)):
+    if df2['488'][i]==0:
+        df2['488'][i]=1
+    if df2['594'][i]==0:
+        df2['594'][i]=1
+    if df2['647'][i]==0:
+        df2['647'][i]=1
+    if df2['555'][i]==0:
+        df2['555'][i]=1
+        
+        
+        
+
 ## converting values in a logarithmic scale
 for i in range(len(lst)):
     lst[i]=np.log(lst[i])
@@ -51,96 +113,168 @@ for i in range(len(lst)):
     lst[i]=np.log(lst[i])
 df2['594']=lst
 
+#seperateing data into rounds
+#dynamic rounds below
+for h in range(2,11):
+    path1 = 'E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\hy\\{:02d}\\'.format(h)
+    if not os.path.exists(path1):
+        os.makedirs(path1) 
+    dfh=df[df['hyb']==h]
+    file_name = path1+'_pos_cell_num_actvsite{:02d}dy1.xlsx'.format(h)
+    dfh.to_excel(file_name)
+    dfh=df1[df1['hyb']==h]
+    file_name = path1+'_pos_cell_num_actvsite{:02d}dy2.xlsx'.format(h)
+    dfh.to_excel(file_name)
 
-dfa=pd.DataFrame()
-dfa['647']=df['647']
-dfa['555']=df['555']
+#static rounds:
+for h in range(12,17):
+    path1 = 'E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\hy\\{:02d}\\'.format(h)
+    if not os.path.exists(path1):
+        os.makedirs(path1) 
+    dfh=df2[df2['hyb']==h]
+    file_name = path1+'_pos_cell_num_actvsite{:02d}st.xlsx'.format(h)
+    dfh.to_excel(file_name)
+    
+path1 = 'E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\hy\\{:02d}\\'.format(18)
+if not os.path.exists(path1):
+    os.makedirs(path1) 
+dfh=df2[df2['hyb']==18]
+file_name = path1+'_pos_cell_num_actvsite{:02d}st.xlsx'.format(18)
+dfh.to_excel(file_name)
+
 
 # in dynamic barcodes main dimension is two so I reduced it to 1
 #cosine metric
-tsne = TSNE(n_components=1,metric=distance.cosine)
+# I tried other metrics but you were right, cosine worked best
 
-tsne_results = tsne.fit_transform(dfa)
-#cluster into two based on tsne values
-kmeans = KMeans(n_clusters=2,n_init=20, max_iter=1000).fit(tsne_results)
-df['label']=list(kmeans.labels_)
-
-## plot to see how clustering worked out
-plt.figure(figsize=(16,10))
-sns.scatterplot(
-    x="647",y='555',
-    hue="label",
-    palette=['green','red'],
-    data=df,
-    legend="full",
-    alpha=0.3
-)
-
-# compare mean log intensities to see how clustering worked
-print(np.mean(df[df['label']==0]['647']))
-print(np.mean(df[df['label']==0]['555']))
-print(np.mean(df[df['label']==1]['647']))
-print(np.mean(df[df['label']==1]['555']))
+for h in range(2,11):
+    path1 = 'E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\hy\\{:02d}\\'.format(h)
+    df = pd.read_excel(path1+'_pos_cell_num_actvsite{:02d}dy1.xlsx'.format(h))
+    dfa=pd.DataFrame()
+    dfa['647']=df['647']
+    dfa['555']=df['555']
+    tsne = TSNE(n_components=1,metric=distance.cosine)
+    tsne_results = tsne.fit_transform(dfa)
+    kmeans = KMeans(n_clusters=2,n_init=20, max_iter=1000).fit(tsne_results)
+    df['label']=list(kmeans.labels_)
+    ## plot to see how clustering worked out
+    plt.figure(figsize=(16,10))
+    sns.scatterplot(
+        x="647",y='555',
+        hue="label",
+        palette=['green','red'],
+        data=df,
+        legend="full",
+        alpha=0.3
+    )
+    # compare mean log intensities to see how clustering worked
+    print(np.mean(df[df['label']==0]['647']))
+    print(np.mean(df[df['label']==0]['555']))
+    print(np.mean(df[df['label']==1]['647']))
+    print(np.mean(df[df['label']==1]['555']))
 
 #do the same for other channels
 
-dfa=pd.DataFrame()
-dfa['488']=df1['488']
-dfa['594']=df1['594']
-tsne = TSNE(n_components=1,metric=distance.cosine)
+for h in range(2,11):
+    path1 = 'E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\hy\\{:02d}\\'.format(h)
+    df = pd.read_excel(path1+'_pos_cell_num_actvsite{:02d}dy2.xlsx'.format(h))
+    dfa=pd.DataFrame()
+    dfa['488']=df['488']
+    dfa['594']=df['594']
+    tsne = TSNE(n_components=1,metric=distance.cosine)
+    tsne_results = tsne.fit_transform(dfa)
+    kmeans = KMeans(n_clusters=2,n_init=20, max_iter=1000).fit(tsne_results)
+    df['label']=list(kmeans.labels_)
+    plt.figure(figsize=(16,10))
+    sns.scatterplot(
+        x="488",y='594',
+        hue="label",
+        palette=['green','red'],
+        data=df,
+        legend="full",
+        alpha=0.3
+    )
+    # compare mean log intensities to see how clustering worked
+    print(np.mean(df[df['label']==0]['488']))
+    print(np.mean(df[df['label']==0]['594']))
+    print(np.mean(df[df['label']==1]['488']))
+    print(np.mean(df[df['label']==1]['594']))
 
-tsne_results = tsne.fit_transform(dfa)
-# I did try other components for Kmeans clustering but it did not change much
-kmeans = KMeans(n_clusters=2,n_init=20, max_iter=1000).fit(tsne_results)
-df1['label']=list(kmeans.labels_)
+# you were right: clusters aren't very pretty
 
-plt.figure(figsize=(16,10))
-sns.scatterplot(
-    x="488",y='594',
-    hue="label",
-    palette=['green','red'],
-    data=df1,
-    legend="full",
-    alpha=0.3
-)
 
 #for static barcode we have dimension of 4
 ## I reduced it to 1 and 2 using tsne
-# 2 was better
+# both were ok
 
+for h in range(11,17):
+    path1 = 'E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\hy\\{:02d}\\'.format(h)
+    df = pd.read_excel(path1+'_pos_cell_num_actvsite{:02d}st.xlsx'.format(h))
+    dfa=pd.DataFrame()
+    dfa['647']=df['647']
+    dfa['488']=df['488']
+    dfa['555']=df['555']
+    dfa['594']=df['594']
+    tsne = TSNE(n_components=2,metric=distance.cosine)
+    tsne_results = tsne.fit_transform(dfa)
+    dfa['tsne-2d-one'] = tsne_results[:,0]
+    dfa['tsne-2d-two'] = tsne_results[:,1]
+    kmeans = KMeans(n_clusters=4).fit(tsne_results)
+    df['label']=list(kmeans.labels_)
+    print(np.mean(df[df['label']==0]['647']))
+    print(np.mean(df[df['label']==0]['488']))
+    print(np.mean(df[df['label']==0]['555']))
+    print(np.mean(df[df['label']==0]['594']))
+    print(np.mean(df[df['label']==1]['647']))
+    print(np.mean(df[df['label']==1]['488']))
+    print(np.mean(df[df['label']==1]['555']))
+    print(np.mean(df[df['label']==1]['594']))
+    print(np.mean(df[df['label']==2]['647']))
+    print(np.mean(df[df['label']==2]['488']))
+    print(np.mean(df[df['label']==2]['555']))
+    print(np.mean(df[df['label']==2]['594']))
+    print(np.mean(df[df['label']==3]['647']))
+    print(np.mean(df[df['label']==3]['488']))
+    print(np.mean(df[df['label']==3]['555']))
+    print(np.mean(df[df['label']==3]['594']))
+
+path1 = 'E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\hy\\{:02d}\\'.format(18)
+df = pd.read_excel(path1+'_pos_cell_num_actvsite{:02d}st.xlsx'.format(18))
 dfa=pd.DataFrame()
-dfa['647']=df2['647']
-dfa['488']=df2['488']
-dfa['555']=df2['555']
-dfa['594']=df2['594']
+dfa['647']=df['647']
+dfa['488']=df['488']
+dfa['555']=df['555']
+dfa['594']=df['594']
 tsne = TSNE(n_components=2,metric=distance.cosine)
 tsne_results = tsne.fit_transform(dfa)
 dfa['tsne-2d-one'] = tsne_results[:,0]
 dfa['tsne-2d-two'] = tsne_results[:,1]
 kmeans = KMeans(n_clusters=4).fit(tsne_results)
-df2['label']=list(kmeans.labels_)
-df2
+df['label']=list(kmeans.labels_)
+print(np.mean(df[df['label']==0]['647']))
+print(np.mean(df[df['label']==0]['488']))
+print(np.mean(df[df['label']==0]['555']))
+print(np.mean(df[df['label']==0]['594']))
+print(np.mean(df[df['label']==1]['647']))
+print(np.mean(df[df['label']==1]['488']))
+print(np.mean(df[df['label']==1]['555']))
+print(np.mean(df[df['label']==1]['594']))
+print(np.mean(df[df['label']==2]['647']))
+print(np.mean(df[df['label']==2]['488']))
+print(np.mean(df[df['label']==2]['555']))
+print(np.mean(df[df['label']==2]['594']))
+print(np.mean(df[df['label']==3]['647']))
+print(np.mean(df[df['label']==3]['488']))
+print(np.mean(df[df['label']==3]['555']))
+print(np.mean(df[df['label']==3]['594']))
 
-# I do not have luxury of plotting so I used mean
-print(np.mean(df2[df2['label']==0]['647']))
-print(np.mean(df2[df2['label']==0]['488']))
-print(np.mean(df2[df2['label']==0]['555']))
-print(np.mean(df2[df2['label']==0]['594']))
-print(np.mean(df2[df2['label']==1]['647']))
-print(np.mean(df2[df2['label']==1]['488']))
-print(np.mean(df2[df2['label']==1]['555']))
-print(np.mean(df2[df2['label']==1]['594']))
-print(np.mean(df2[df2['label']==2]['647']))
-print(np.mean(df2[df2['label']==2]['488']))
-print(np.mean(df2[df2['label']==2]['555']))
-print(np.mean(df2[df2['label']==2]['594']))
-print(np.mean(df2[df2['label']==3]['647']))
-print(np.mean(df2[df2['label']==3]['488']))
-print(np.mean(df2[df2['label']==3]['555']))
-print(np.mean(df2[df2['label']==3]['594']))
+
+# I do not have luxury of plotting here so I used mean
 
 
 #questions:
+# label complexity: each label represents one of 2 channels in dynamic barcode clustering, but between each round these labels are not in harmony:
+# it is possible that labels wich indicate 647 as dominant channel be labeled as 1 in one round and 0 in another.solution:identifying clusters with their mean intensity???
 #how can I evaluate the clustring?
 #any points for improvment?
 #do you find 647-555 clustring of this example valid(look at mean values)?
