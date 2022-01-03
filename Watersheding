@@ -1,0 +1,23 @@
+#watershed
+ch_name = ["647","488","555","594"]
+hyb_num=18
+num_pos=24
+for ch in range(len(ch_name)):
+    seg_path = data_dir + '\\Analysis\\' + ch_name[ch]  + '_threshold\\'
+    for p in range(1,num_pos+1):
+        for h in range(1,hyb_num+1):
+            binary_mask= skimage.io.imread(seg_path+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_seg.tif'.format(p,h))
+            binary_mask=skimage.segmentation.clear_border(binary_mask)
+            distance = -1 * ndi.distance_transform_edt(binary_mask)
+            local_mini = skimage.morphology.local_minima(distance)
+            selem = skimage.morphology.disk(1)
+            local_mini_dil = skimage.morphology.dilation(local_mini, selem)
+            mrkr = ndi.label(local_mini_dil)[0]
+            labels = skimage.segmentation.watershed(distance, markers = mrkr, mask=binary_mask, watershed_line=True)
+            #labels1=ndi.morphology.binary_fill_holes(labels)
+            #error which we discusssed was due fill_holes
+            # instead I used closing funtion
+            labels1=closing(labels)
+            # I checked closing funtion about your concerns,it worked well(2 dots in 2048 pic after closing remain intact)
+            file_name = data_dir + '\\Analysis\\' + ch_name[ch]  + '_watershed\\'+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_wtrshed.tif'.format(p,h)
+            skimage.io.imsave(file_name, labels1, check_contrast=False)
