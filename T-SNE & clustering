@@ -455,7 +455,7 @@ for h in range(2,11):
 path1 = 'E:\\ALI\\processing project\\Zombie\\dil 1\\Analysis\\hy\\{:02d}\\'.format(17)
 df = pd.read_excel(path1+'_pos_cell_num_actvsite{:02d}stclustermod.xlsx'.format(17))
 df['seqnum']=[19 for i in range(len(df))]
-df.to_excel(path1+'_pos_cell_num_actvsite{:02d}stclustermod.xlsx'.format(h))
+df.to_excel(path1+'_pos_cell_num_actvsite{:02d}stclustermod.xlsx'.format(17))
 
 
 
