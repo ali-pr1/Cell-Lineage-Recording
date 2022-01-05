@@ -187,7 +187,7 @@ for h in range(2,11):
     kmeans = KMeans(n_clusters=2,n_init=30, max_iter=3000).fit(tsne_results)
     score = metrics.silhouette_score(dfa, kmeans.labels_, metric='euclidean')
     kmeans1 = KMeans(n_clusters=2,n_init=30, max_iter=3000).fit(tsne_results1)
-    score1 = metrics.silhouette_score(df1a, kmeans.labels_, metric='euclidean')
+    score1 = metrics.silhouette_score(df1a, kmeans1.labels_, metric='euclidean')
     df1['label']=list(kmeans1.labels_)
     df['label']=list(kmeans.labels_)
     plt.figure(figsize=(16,10))
