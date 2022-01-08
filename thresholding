@@ -1,0 +1,24 @@
+#thresholding
+#using otsu method(best results in try_all_thresholds)
+ch_name = ["647","488","555","594"]
+hyb_num=18
+num_pos=24
+for ch in range(len(ch_name)):
+   FISH_path = data_dir + '\\Analysis\\' + ch_name[ch] + '_registered\\' + '\\Ilastik_output\\'
+   for p in range(1,num_pos+1):
+      for h in range(1,hyb_num+1):
+         mask_temp = skimage.io.imread(FISH_path+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_Probabilities.tif'.format(p,h))
+         img = mask_temp[:,:,1]
+         #denoise using gaussians
+         sigma_est=np.mean(restoration.estimate_sigma(img))
+         blurred_image = skimage.filters.gaussian(img, sigma=sigma_est)
+         #method below is time consuming but probably more accurate
+         #img=skimage.img_as_float(img)
+         #sigma_est=np.mean(restoration.estimate_sigma(img))
+         #denoise=restoration.denoise_nl_means(img)
+         #blurred_image=skimage.img_as_ubyte(denoise)
+         # perform automatic thresholding to produce a binary image
+         t = skimage.filters.threshold_otsu(blurred_image)
+         binary_mask = blurred_image > t
+         file_name = data_dir + '\\Analysis\\' + ch_name[ch]  + '_threshold\\'+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_seg.tif'.format(p,h)
+         skimage.io.imsave(file_name, binary_mask, check_contrast=False)
