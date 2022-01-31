@@ -1,0 +1,35 @@
+cd('E:\ALI\processing project\Zombie\clustering\hy3a')
+Data1= readmatrix('11\_pos_cell_num_actvsite11dy1');
+Data2= readmatrix('11\_pos_cell_num_actvsite11dy2');
+DataA=Data1(:,[2,3]);
+DataB=Data2(:,[2,3]);
+[idx,C] = kmeans(DataA,2,'Distance','Cosine');
+Data1=[Data1 idx];
+figure;
+plot(DataA(idx==1,1),DataA(idx==1,2),'r.','MarkerSize',12)
+hold on
+plot(DataA(idx==2,1),DataA(idx==2,2),'b.','MarkerSize',12)
+plot(C(:,1),C(:,2),'kx',...
+     'MarkerSize',15,'LineWidth',3) 
+legend('Cluster 1','Cluster 2','Centroids',...
+       'Location','NW')
+title 'hyb10,1'
+hold off
+fig=gcf;
+exportgraphics(fig,'hyb10,1.png','Resolution',1200)
+[idx,C] = kmeans(DataB,2,'Distance','Cosine');
+Data2=[Data2 idx];
+figure;
+plot(DataB(idx==1,1),DataB(idx==1,2),'r.','MarkerSize',12)
+hold on
+plot(DataB(idx==2,1),DataB(idx==2,2),'b.','MarkerSize',12)
+plot(C(:,1),C(:,2),'kx',...
+     'MarkerSize',15,'LineWidth',3) 
+legend('Cluster 1','Cluster 2','Centroids',...
+       'Location','NW')
+title 'hyb10,2'
+hold off
+fig=gcf;
+exportgraphics(fig,'hyb10,2.png','Resolution',1200)
+xlswrite('11\matdy1.xlsx',Data1)
+xlswrite('11\matdy2.xlsx',Data2)
