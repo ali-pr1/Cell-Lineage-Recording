@@ -1,0 +1,230 @@
+ch_name = ["647","488","555","594"]
+hyb_num=18
+num_pos=24
+for p in range(1,num_pos+1):
+        path1 = 'E:\\ALI\\processing project\\Zombie\\clustering\\pos4\\{:02d}\\'.format(p)
+        if not os.path.exists(path1):
+                os.makedirs(path1) 
+        nuclei=skimage.io.imread(data_dir + '\\Analysis\\' +'\\DAPI\\'+'pos_{:02d}_cp_masks.png'.format(p))
+        nuclei,num=label(nuclei,return_num=True)
+        ID1=pd.DataFrame(columns=('inf','647','555'))
+        ID2=pd.DataFrame(columns=('inf','488','594'))
+        ID3=pd.DataFrame(columns=('inf','647','488','555','594'))
+        infd=[]
+        infs=[]
+        ld1=[]
+        ld2=[]
+        ld3=[]
+        ld4=[]
+        ls1=[]
+        ls2=[]
+        ls3=[]
+        ls4=[]
+        for i in range(1,num):
+                path2= path1 +'{:02d}\\'.format(i)
+                if not os.path.exists(path2):
+                        os.makedirs(path2) 
+                #those activesites which are not in any cell won't be considered anymore
+                #cellwise
+                coords=np.where(nuclei!=i)
+                df=pd.DataFrame(ch_name)
+                for h in range(1,hyb_num+1):
+                        # integrating data of each hyb for all channels
+                        act=[]
+                        inten=[]
+                        cent=[]
+                        for ch in range(len(ch_name)):
+                                img= skimage.io.imread(data_dir + '\\Analysis\\' + ch_name[ch]  + '_actvsite_3\\'+'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}_coloc.tif'.format(p,h))
+                                img[coords]=0
+                                img,num1=label(img,return_num=True)
+                                org= skimage.io.imread(data_dir + '\\Analysis\\' + ch_name[ch]  + '_registered\\'+ 'AF'+ ch_name[ch] +'_pos{:02d}_hyb{:02d}.tif'.format(p,h))
+                                data1 = regionprops_table(
+                                label(img,connectivity=2),
+                                org,
+                                properties=('label', 'centroid','area','mean_intensity','filled_area'),
+                                )
+                                table = pd.DataFrame(data1)
+                                lst0=list(table['label'])
+                                lst1=list(table['centroid-0'])
+                                lst2=list(table['centroid-1'])
+                                lst3=list(table['mean_intensity'])
+                                lst4=list(table['filled_area'])
+                                lst=[[lst0[i],lst1[i],lst2[i],lst3[i],lst4[i]] for i in range(len(lst1))]
+                                lst1=[[int(lst1[i]),int(lst2[i])]for i in range(len(lst0))]
+                                cent.append(lst1)
+                                intensity=[]
+                                cell_num=[]
+                                labels=[]
+                                for prop in lst:
+                                        intensity.append(prop[3]*prop[4])
+                                        labels.append(prop[0])
+
+                                inten.append(intensity)
+                                act.append(labels)
+                        df["numactv_h_{:02d}".format(h)]=act
+                        df["coords_{:02d}".format(h)]=cent
+                        df["intensity_h_{:02d}".format(h)]=inten
+                filename = path2+'_pos{:02d}_cell_num{:02d}_props.xlsx'.format(p,i)
+                df.to_excel(filename)
+                inf=[]
+                for cha in range(len(ch_name)):
+                        for hy in range(1,hyb_num+1):
+                                if len(df["coords_{:02d}".format(hy)][cha])!=0:
+                                        for l in df["coords_{:02d}".format(hy)][cha]:
+                                                inf.append([l,hy,cha])         
+                if len(inf)!=0:
+                        cord=[]
+                        cord0=[]
+                        cord1=[]
+                        for i in range(len(inf)):
+                                cord.append(inf[i][0])
+                                cord0.append(inf[i][0][0])
+                                cord1.append(inf[i][0][1])
+                        # finding those who belong to the same active site
+                        # change distance as you see fit
+                        dfa=pd.DataFrame()
+                        dfa['coord0']=cord0
+                        dfa['coord1']=cord1
+                        clustering = DBSCAN(eps=10).fit(cord)
+                        dfa['label']=clustering.labels_
+                        lx=list(set(clustering.labels_))
+                        plt.figure(figsize=(16,10))
+                        ax=sns.scatterplot(
+                                x="coord0",y='coord1',
+                                hue="label",
+                                data=dfa,
+                                legend="full",
+                                alpha=0.3
+                        )
+                        fig = ax.get_figure()
+                        picname = path2+'DBscan.png'
+                        fig.savefig(picname)
+                        clusters=[]
+                        for k in lx:
+                                cluster=[]
+                                for j in range(len(cord)):
+                                        if clustering.labels_[j]==k:
+                                                cluster.append(inf[j])
+                                clusters.append(cluster)
+                        
+                        #extracting datas for each member of each cluster
+                        clus=[]
+                        for c in range(len(clusters)):
+                                clust=[]
+                                for j in range(len(clusters[c])):
+                                        x=clusters[c][j][0][0]
+                                        y=clusters[c][j][0][1]
+                                        hybn=clusters[c][j][1]
+                                        cha=clusters[c][j][2]
+                                        for k in range(len(list(df["coords_{:02d}".format(hybn)])[cha])):
+                                                if list(df["coords_{:02d}".format(hybn)])[cha][k][0]==x and list(df["coords_{:02d}".format(hybn)])[cha][k][1]==y:
+                                                        clust.append([hybn,cha,k])
+                                clus.append(clust)
+                        #using that data to find intensities and labels for each active site
+                        for clu in range(len(clus)):
+                                df1=pd.DataFrame(index=['hyb{:02d}'.format(k) for k in range(1,hyb_num+1)],columns=ch_name)
+                                df2=pd.DataFrame(index=['hyb{:02d}'.format(k) for k in range(1,hyb_num+1)],columns=ch_name)
+                                for sam in range(len(clus[clu])):
+                                        h=clus[clu][sam][0]
+                                        ch=clus[clu][sam][1]
+                                        u=clus[clu][sam][2]
+                                        df1[ch_name[ch]]['hyb{:02d}'.format(h)]=df["intensity_h_{:02d}".format(h)][ch][u]
+                                        df2[ch_name[ch]]['hyb{:02d}'.format(h)]=df["numactv_h_{:02d}".format(h)][ch][u]
+
+
+
+                                #finding legit active sites
+                                df1=pd.DataFrame.transpose(df1)
+                                po=[]
+                                k=0
+                                j=0
+                                for h in range(1,10):
+                                        df1['hyb{:02d}'.format(h)]=df1['hyb{:02d}'.format(h)].fillna(0)
+                                        lst=[]
+                                        for v in df1['hyb{:02d}'.format(h)]:
+                                                lst.append(v)
+                                        if sum(lst)!=0:
+                                                k+=1
+                                po.append(k)
+                                for h in range(11,18):
+                                        df1['hyb{:02d}'.format(h)]=df1['hyb{:02d}'.format(h)].fillna(0)
+                                        lst=[]
+                                        for v in df1['hyb{:02d}'.format(h)]:
+                                                lst.append(v)
+                                        if sum(lst)!=0:
+                                                j+=1
+                                po.append(j)
+                                df1['hyb10']=df1['hyb10'].fillna(0)
+                                df1['hyb18']=df1['hyb18'].fillna(0)
+                                lst10=[]
+                                lst18=[]
+                                for v in df1['hyb10']:
+                                        lst10.append(v)
+                                for v in df1['hyb18']:
+                                        lst18.append(v)
+                                if sum(lst18)!=0 or sum(lst10)!=0:
+                                        po[1]=po[1]+1
+                                #change the score as you wish
+                                if po[0]>=5 and po[1]>=3:
+                                        df1=pd.DataFrame.transpose(df1)
+                                        df2=df2.fillna(0)
+                                        for ch in ch_name:
+                                                nonzero=[]
+                                                zero=[]
+                                                for hy in range(1,hyb_num+1):
+                                                        if df2[ch]['hyb{:02d}'.format(hy)]!=0:
+                                                                nonzero.append([ch,hy,int(df2[ch]['hyb{:02d}'.format(hy)])])
+                                                        elif df2[ch]['hyb{:02d}'.format(hy)]==0:
+                                                                zero.append([ch,hy])
+                                                cor=[]
+                                                for k in nonzero:
+                                                        img= skimage.io.imread(data_dir + '\\Analysis\\' + k[0]  + '_actvsite_3\\'+'AF'+ k[0] +'_pos{:02d}_hyb{:02d}_coloc.tif'.format(p,k[1]))
+                                                        img[coords]=0
+                                                        img,num1=label(img,return_num=True)
+                                                        pl=np.where(img!=k[2])
+                                                        cor.append(pl)
+                                                for z in zero:
+                                                        intensity=[]
+                                                        org= skimage.io.imread(data_dir + '\\Analysis\\' + z[0]  + '_registered\\'+'AF'+ z[0] +'_pos{:02d}_hyb{:02d}.tif'.format(p,z[1]))
+                                                        for prop in range(len(cor)):
+                                                                cop=np.copy(org)
+                                                                cop[cor[prop]]=0
+                                                                inten=np.sum(cop)
+                                                                intensity.append(inten)
+                                                        if len(intensity)!=0:
+                                                                y=np.mean(intensity)
+                                                                df1[z[0]]['hyb{:02d}'.format(z[1])]=y
+                                        #filling zeros with maximum intensity in probable coords based on label numbers
+                                        #code below reconstruct barcode
+                                        for hy in range(2,11):
+                                                infd.append([i,clu,hy])
+                                                ld1.append(df1['647']['hyb{:02d}'.format(hy)])
+                                                ld2.append(df1['555']['hyb{:02d}'.format(hy)])
+                                                ld3.append(df1['488']['hyb{:02d}'.format(hy)])
+                                                ld4.append(df1['594']['hyb{:02d}'.format(hy)])
+                                        for hy in range(12,17) or hy==18:
+                                                infs.append([i,clu,hy])
+                                                ls1.append(df1['647']['hyb{:02d}'.format(hy)])
+                                                ls2.append(df1['555']['hyb{:02d}'.format(hy)])
+                                                ls3.append(df1['488']['hyb{:02d}'.format(hy)])
+                                                ls4.append(df1['594']['hyb{:02d}'.format(hy)])
+                                        file_name = path2+'_pos{:02d}_cell_num{:02d}_actvsite{:02d}_props.xlsx'.format(p,i,clu)
+                                        df1.to_excel(file_name)
+        ID1['inf']=infd
+        ID1['647']=ld1
+        ID1['555']=ld2
+        ID2['inf']=infd
+        ID2['488']=ld3
+        ID2['594']=ld4
+        ID3['inf']=infs
+        ID3['647']=ls1
+        ID3['555']=ls2
+        ID3['488']=ls3
+        ID3['594']=ls4
+        file_name1 = path1+'_pos{:02d}dy1.xlsx'.format(p)
+        ID1.to_excel(file_name1)
+        file_name2 = path1+'_pos{:02d}dy2.xlsx'.format(p)
+        ID2.to_excel(file_name2)
+        file_name3 = path1+'_pos{:02d}st.xlsx'.format(p)
+        ID3.to_excel(file_name3)
+                
