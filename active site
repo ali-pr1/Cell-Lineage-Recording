@@ -7,11 +7,15 @@ for p in range(1,num_pos+1):
                 os.makedirs(path1) 
         nuclei=skimage.io.imread(data_dir + '\\Analysis\\' +'\\DAPI\\'+'pos_{:02d}_cp_masks.png'.format(p))
         nuclei,num=label(nuclei,return_num=True)
-        ID1=pd.DataFrame(columns=('inf','647','555'))
-        ID2=pd.DataFrame(columns=('inf','488','594'))
-        ID3=pd.DataFrame(columns=('inf','647','488','555','594'))
-        infd=[]
-        infs=[]
+        ID1=pd.DataFrame(columns=('647','555'))
+        ID2=pd.DataFrame(columns=('488','594'))
+        ID3=pd.DataFrame(columns=('647','488','555','594'))
+        celld=[]
+        actd=[]
+        hybd=[]
+        cells=[]
+        acts=[]
+        hybs=[]
         ld1=[]
         ld2=[]
         ld3=[]
@@ -197,26 +201,43 @@ for p in range(1,num_pos+1):
                                         #filling zeros with maximum intensity in probable coords based on label numbers
                                         #code below reconstruct barcode
                                         for hy in range(2,11):
-                                                infd.append([i,clu,hy])
+                                                celld.append(i)
+                                                actd.append(clu)
+                                                hybd.append(hy)
                                                 ld1.append(df1['647']['hyb{:02d}'.format(hy)])
                                                 ld2.append(df1['555']['hyb{:02d}'.format(hy)])
                                                 ld3.append(df1['488']['hyb{:02d}'.format(hy)])
                                                 ld4.append(df1['594']['hyb{:02d}'.format(hy)])
-                                        for hy in range(12,17) or hy==18:
-                                                infs.append([i,clu,hy])
+                                        for hy in range(11,17):
+                                                cells.append(i)
+                                                acts.append(clu)
+                                                hybs.append(hy)
                                                 ls1.append(df1['647']['hyb{:02d}'.format(hy)])
                                                 ls2.append(df1['555']['hyb{:02d}'.format(hy)])
                                                 ls3.append(df1['488']['hyb{:02d}'.format(hy)])
                                                 ls4.append(df1['594']['hyb{:02d}'.format(hy)])
+                                        cells.append(i)
+                                        acts.append(clu)
+                                        hybs.append(18)
+                                        ls1.append(df1['647']['hyb{:02d}'.format(18)])
+                                        ls2.append(df1['555']['hyb{:02d}'.format(18)])
+                                        ls3.append(df1['488']['hyb{:02d}'.format(18)])
+                                        ls4.append(df1['594']['hyb{:02d}'.format(18)])
                                         file_name = path2+'_pos{:02d}_cell_num{:02d}_actvsite{:02d}_props.xlsx'.format(p,i,clu)
                                         df1.to_excel(file_name)
-        ID1['inf']=infd
+        ID1['cell']=celld
+        ID1['act']=actd
+        ID1['hyb']=hybd
         ID1['647']=ld1
         ID1['555']=ld2
-        ID2['inf']=infd
+        ID2['cell']=celld
+        ID2['act']=actd
+        ID2['hyb']=hybd
         ID2['488']=ld3
         ID2['594']=ld4
-        ID3['inf']=infs
+        ID3['cell']=cells
+        ID3['act']=acts
+        ID3['hyb']=hybs
         ID3['647']=ls1
         ID3['555']=ls2
         ID3['488']=ls3
