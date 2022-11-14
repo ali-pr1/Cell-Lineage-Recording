@@ -1,10 +1,5 @@
-# project
+
+A series of codes desgined for image processing and colocalization
 
 
-#this codes are designed for Image processing of fluorescence microscopy images
-
-
-#each file regards an specific action
-
-
-#file pre contains modules which were used throughout whole process
+The main data belongs to fluorescence microscopy images
